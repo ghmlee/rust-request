@@ -8,7 +8,7 @@ homepage = "https://github.com/ghmlee/rust-request"
 repository = "https://github.com/ghmlee/rust-request.git"
 documentation = "https://ghmlee.github.io/rust-request/doc/request"
 readme = "README.md"
-keywords = ["request", "http", "https", "client", "hyper", "postman"]
+keywords = ["request", "http", "client", "hyper", "postman"]
 
 [dependencies]
 url = "0.2.29"
