@@ -1,0 +1,15 @@
+[package]
+name = "request"
+description = "Request"
+version = "0.0.1"
+authors = ["Graham Lee <ghmlee@ghmlee.com>"]
+license = "Apache-2.0"
+homepage = "https://github.com/ghmlee/rust-request"
+repository = "https://github.com/ghmlee/rust-request.git"
+documentation = "https://ghmlee.github.io/rust-request/doc/request"
+readme = "README.md"
+keywords = ["request", "http", "https", "client", "hyper", "postman"]
+
+[dependencies]
+url = "0.2.29"
+openssl = "0.6.0"
