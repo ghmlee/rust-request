@@ -1,23 +1,35 @@
 extern crate openssl;
 
 mod url;
-mod method;
 pub mod response;
 
 use std::io::{self, Write, Read};
+use std::collections::HashMap;
 use std::net::TcpStream;
-use method::Method;
 use url::{Protocol, Url};
 use response::Response;
 use openssl::ssl::{SslStream, SslContext};
 use openssl::ssl::SslMethod::Sslv23;
 
-pub fn post(url: &str) -> io::Result<Response> {
-    return connect(Method::POST, &try!(Url::new(url)));
+pub fn post(url: &str,
+            headers: &mut HashMap<String, String>,
+            body: &str) -> io::Result<Response> {
+    return connect("POST", &try!(Url::new(url)), headers, body);
 }
 
-fn connect(method: Method, url: &Url) -> io::Result<Response> {
+pub fn get(url: &str,
+           headers: &mut HashMap<String, String>) -> io::Result<Response> {
+    return connect("GET", &try!(Url::new(url)), headers, "");
+}
+
+fn connect(method: &str,
+           url: &Url,
+           headers: &mut HashMap<String, String>,
+           body: &str) -> io::Result<Response> {
+    // address
     let addr = format!("{}:{}", url.host, url.port);
+
+    // host
     let host = match url.protocol {
         Protocol::HTTP => {
             match url.port {
@@ -33,11 +45,24 @@ fn connect(method: Method, url: &Url) -> io::Result<Response> {
         }
     };
     
-    let http_req = format!("{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
-                          method::to_string(method),
-                          url.path,
-                          host);
+    // headers
+    let mut http_headers = String::new();
+    for header in headers.iter() {
+        let key = header.0;
+        let value = header.1;
+        http_headers.push_str(&format!("\r\n{}: {}", key, value));
+    }
+    http_headers.push_str("\r\n\r\n");
+    
+    let http_content = format!("{} {} HTTP/1.1\r\nHost: {}{}{}",
+                           method,
+                           url.path,
+                           host,
+                           http_headers,
+                           body);
+    let buf: &[u8] = http_content.as_bytes();
 
+    // stream
     let mut stream = match TcpStream::connect(&*addr) {
         Ok(stream) => stream,
         Err(_) => {
@@ -46,10 +71,11 @@ fn connect(method: Method, url: &Url) -> io::Result<Response> {
             return Err(err);
         }
     };
-    
+
+    // raw
     let raw = match url.protocol {
         Protocol::HTTP => {
-            let _ = stream.write(http_req.as_bytes());
+            let _ = stream.write(buf);
             let raw = try!(read(&mut stream));
             raw
         }
@@ -72,13 +98,15 @@ fn connect(method: Method, url: &Url) -> io::Result<Response> {
                 }
             };
 
-            let _ = ssl_stream.write(http_req.as_bytes());
+            let _ = ssl_stream.write(buf);
             let raw = try!(read(&mut ssl_stream));
             raw
         }
     };
 
+    // response
     let response = try!(get_response(&raw));
+    
     // redirect
     if response.status_code / 100 == 3 {
         let location = match response.headers.get("Location") {
@@ -89,6 +117,9 @@ fn connect(method: Method, url: &Url) -> io::Result<Response> {
                 return Err(err);
             }
         };
+
+        // it will support for a relative path
+        return connect(method, &try!(Url::new(&location)), headers, body);
     }
     
     return Ok(response);
