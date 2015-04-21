@@ -1,3 +1,5 @@
+//! Request
+#![doc(html_root_url="https://ghmlee.github.io/rust-request/doc")]
 extern crate openssl;
 
 mod url;
