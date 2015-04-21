@@ -6,7 +6,7 @@
 
 ```
 [dependencies]
-request = "0.0.1"
+request = "0.0.3"
 ```
 
 ```rust
