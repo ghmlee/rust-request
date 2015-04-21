@@ -3,7 +3,7 @@ extern crate openssl;
 mod url;
 pub mod response;
 
-use std::io::{self, Write, Read};
+use std::io::{Write, Read, Result, Error, ErrorKind};
 use std::collections::HashMap;
 use std::net::TcpStream;
 use url::{Protocol, Url};
@@ -13,19 +13,40 @@ use openssl::ssl::SslMethod::Sslv23;
 
 pub fn post(url: &str,
             headers: &mut HashMap<String, String>,
-            body: &str) -> io::Result<Response> {
+            body: &[u8]) -> Result<Response> {
     return connect("POST", &try!(Url::new(url)), headers, body);
 }
 
 pub fn get(url: &str,
-           headers: &mut HashMap<String, String>) -> io::Result<Response> {
-    return connect("GET", &try!(Url::new(url)), headers, "");
+           headers: &mut HashMap<String, String>) -> Result<Response> {
+    return connect("GET", &try!(Url::new(url)), headers, "".as_bytes());
+}
+
+pub fn put(url: &str,
+            headers: &mut HashMap<String, String>,
+            body: &[u8]) -> Result<Response> {
+    return connect("PUT", &try!(Url::new(url)), headers, body);
+}
+
+pub fn delete(url: &str,
+            headers: &mut HashMap<String, String>) -> Result<Response> {
+    return connect("DELETE", &try!(Url::new(url)), headers, "".as_bytes());
+}
+
+pub fn options(url: &str,
+           headers: &mut HashMap<String, String>) -> Result<Response> {
+    return connect("OPTIONS", &try!(Url::new(url)), headers, "".as_bytes());
+}
+
+pub fn head(url: &str,
+           headers: &mut HashMap<String, String>) -> Result<Response> {
+    return connect("HEAD", &try!(Url::new(url)), headers, "".as_bytes());
 }
 
 fn connect(method: &str,
            url: &Url,
            headers: &mut HashMap<String, String>,
-           body: &str) -> io::Result<Response> {
+           body: &[u8]) -> Result<Response> {
     // address
     let addr = format!("{}:{}", url.host, url.port);
 
@@ -54,20 +75,22 @@ fn connect(method: &str,
     }
     http_headers.push_str("\r\n\r\n");
     
-    let http_content = format!("{} {} HTTP/1.1\r\nHost: {}{}{}",
-                           method,
-                           url.path,
-                           host,
-                           http_headers,
-                           body);
-    let buf: &[u8] = http_content.as_bytes();
+    let http_content = format!("{} {} HTTP/1.1\r\nHost: {}{}",
+                               method,
+                               url.path,
+                               host,
+                               http_headers);
+    
+    let mut buf: Vec<u8> = Vec::new();
+    for x in http_content.as_bytes() { buf.push(*x); }
+    for x in body { buf.push(*x); }
 
     // stream
     let mut stream = match TcpStream::connect(&*addr) {
         Ok(stream) => stream,
         Err(_) => {
-            let err = io::Error::new(io::ErrorKind::NotConnected,
-                                     "");
+            let err = Error::new(ErrorKind::NotConnected,
+                                 "");
             return Err(err);
         }
     };
@@ -75,7 +98,7 @@ fn connect(method: &str,
     // raw
     let raw = match url.protocol {
         Protocol::HTTP => {
-            let _ = stream.write(buf);
+            let _ = stream.write(&*buf);
             let raw = try!(read(&mut stream));
             raw
         }
@@ -83,8 +106,8 @@ fn connect(method: &str,
             let context = match SslContext::new(Sslv23) {
                 Ok(context) => context,
                 Err(_) => {
-                    let err = io::Error::new(io::ErrorKind::NotConnected,
-                                             "");
+                    let err = Error::new(ErrorKind::NotConnected,
+                                         "");
                     return Err(err);
                 }
             };
@@ -92,13 +115,13 @@ fn connect(method: &str,
             let mut ssl_stream = match SslStream::new(&context, stream) {
                 Ok(stream) => stream,
                 Err(_) => {
-                    let err = io::Error::new(io::ErrorKind::NotConnected,
-                                             "");
+                    let err = Error::new(ErrorKind::NotConnected,
+                                         "");
                     return Err(err);
                 }
             };
 
-            let _ = ssl_stream.write(buf);
+            let _ = ssl_stream.write(&*buf);
             let raw = try!(read(&mut ssl_stream));
             raw
         }
@@ -112,8 +135,8 @@ fn connect(method: &str,
         let location = match response.headers.get("Location") {
             Some(location) => location,
             None => {
-                let err = io::Error::new(io::ErrorKind::NotConnected,
-                                         "");
+                let err = Error::new(ErrorKind::NotConnected,
+                                     "");
                 return Err(err);
             }
         };
@@ -125,7 +148,7 @@ fn connect(method: &str,
     return Ok(response);
 }
 
-fn read<S: Read>(stream: &mut S) -> io::Result<String> {
+fn read<S: Read>(stream: &mut S) -> Result<String> {
     const BUFFER_SIZE: usize = 1024;
     let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
     let mut raw = String::new();
@@ -133,35 +156,36 @@ fn read<S: Read>(stream: &mut S) -> io::Result<String> {
         let len = match stream.read(&mut buffer) {
             Ok(size) => size,
             Err(_) => {
-                let err = io::Error::new(io::ErrorKind::NotConnected,
+                let err = Error::new(ErrorKind::NotConnected,
                                      "");
                 return Err(err);
             }
         };
         
+        if len <= 0 { break; }
+        
         match std::str::from_utf8(&buffer[0 .. len]) {
             Ok(buf) => raw.push_str(buf),
             Err(_) => {
-                let err = io::Error::new(io::ErrorKind::NotConnected,
+                let err = Error::new(ErrorKind::NotConnected,
                                      "");
                 return Err(err);
             }
         }
-        
-        if len < BUFFER_SIZE { break; }
     }
 
     return Ok(raw);
 }
 
-fn get_response(raw: &str) -> io::Result<Response> {
+fn get_response(raw: &str) -> Result<Response> {
     let http_response: Vec<&str> = raw.split("\r\n\r\n").collect();
 
     if http_response.len() < 2 {
-        let err = io::Error::new(io::ErrorKind::InvalidInput,
-                                 "Server returns an invalid response.");
+        let err = Error::new(ErrorKind::InvalidInput,
+                             "Server returns an invalid response.");
         return Err(err);
     }
+    
     let http_header = http_response[0];
     let http_body = http_response[1];
     let chunked_content_body: Vec<&str> = http_body.split("\r\n").collect();
