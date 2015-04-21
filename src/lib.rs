@@ -7,6 +7,7 @@ pub mod response;
 
 use std::io::{Write, Read, Result, Error, ErrorKind};
 use std::collections::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::net::TcpStream;
 use url::{Protocol, Url};
 use response::Response;
@@ -69,6 +70,11 @@ fn connect(method: &str,
     };
     
     // headers
+    match headers.entry("Content-Length".to_string()) {
+        Occupied(entry) => { entry.remove(); }
+        Vacant(_) => { }
+    }
+    headers.insert("Content-Length".to_string(), format!("{}", body.len()).to_string());
     let mut http_headers = String::new();
     for header in headers.iter() {
         let key = header.0;
