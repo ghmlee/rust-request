@@ -1,6 +1,7 @@
 extern crate url;
 
 use std::io::{self, Result, ErrorKind};
+use std::error::Error;
 
 pub enum Protocol {
     HTTP,
