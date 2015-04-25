@@ -5,7 +5,8 @@ extern crate openssl;
 mod url;
 pub mod response;
 
-use std::io::{Write, Read, Result, Error, ErrorKind};
+use std::io::{self, Write, Read, Result, ErrorKind};
+use std::error::Error;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::net::TcpStream;
@@ -96,9 +97,9 @@ fn connect(method: &str,
     // stream
     let mut stream = match TcpStream::connect(&*addr) {
         Ok(stream) => stream,
-        Err(_) => {
-            let err = Error::new(ErrorKind::NotConnected,
-                                 "");
+        Err(e) => {
+            let err = io::Error::new(ErrorKind::NotConnected,
+                                     e.description());
             return Err(err);
         }
     };
@@ -113,18 +114,18 @@ fn connect(method: &str,
         Protocol::HTTPS => {
             let context = match SslContext::new(Sslv23) {
                 Ok(context) => context,
-                Err(_) => {
-                    let err = Error::new(ErrorKind::NotConnected,
-                                         "");
+                Err(e) => {
+                    let err = io::Error::new(ErrorKind::NotConnected,
+                                             e.description());
                     return Err(err);
                 }
             };
 
             let mut ssl_stream = match SslStream::new(&context, stream) {
                 Ok(stream) => stream,
-                Err(_) => {
-                    let err = Error::new(ErrorKind::NotConnected,
-                                         "");
+                Err(e) => {
+                    let err = io::Error::new(ErrorKind::NotConnected,
+                                             e.description());
                     return Err(err);
                 }
             };
@@ -143,8 +144,8 @@ fn connect(method: &str,
         let location = match response.headers.get("Location") {
             Some(location) => location,
             None => {
-                let err = Error::new(ErrorKind::NotConnected,
-                                     "");
+                let err = io::Error::new(ErrorKind::NotConnected,
+                                         "Server returns an invalid response.");
                 return Err(err);
             }
         };
@@ -163,9 +164,9 @@ fn read<S: Read>(stream: &mut S) -> Result<String> {
     loop {
         let len = match stream.read(&mut buffer) {
             Ok(size) => size,
-            Err(_) => {
-                let err = Error::new(ErrorKind::NotConnected,
-                                     "");
+            Err(e) => {
+                let err = io::Error::new(ErrorKind::NotConnected,
+                                         e.description());
                 return Err(err);
             }
         };
@@ -174,9 +175,9 @@ fn read<S: Read>(stream: &mut S) -> Result<String> {
         
         match std::str::from_utf8(&buffer[0 .. len]) {
             Ok(buf) => raw.push_str(buf),
-            Err(_) => {
-                let err = Error::new(ErrorKind::NotConnected,
-                                     "");
+            Err(e) => {
+                let err = io::Error::new(ErrorKind::NotConnected,
+                                         e.description());
                 return Err(err);
             }
         }
@@ -189,8 +190,8 @@ fn get_response(raw: &str) -> Result<Response> {
     let http_response: Vec<&str> = raw.split("\r\n\r\n").collect();
 
     if http_response.len() < 2 {
-        let err = Error::new(ErrorKind::InvalidInput,
-                             "Server returns an invalid response.");
+        let err = io::Error::new(ErrorKind::InvalidInput,
+                                 "Server returns an invalid response.");
         return Err(err);
     }
     

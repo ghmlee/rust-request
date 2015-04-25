@@ -1,6 +1,6 @@
 extern crate url;
 
-use std::io::{Result, Error, ErrorKind};
+use std::io::{self, Result, ErrorKind};
 
 pub enum Protocol {
     HTTP,
@@ -18,9 +18,9 @@ impl Url {
     pub fn new(url: &str) -> Result<Url> {
         let parsed_url = match url::Url::parse(url) {
             Ok(url) => url,
-            Err(_) => {
-                let err = Error::new(ErrorKind::InvalidInput,
-                                     "Invalid URL.");
+            Err(e) => {
+                let err = io::Error::new(ErrorKind::InvalidInput,
+                                         e.description());
                 return Err(err);
             }
         };
@@ -29,8 +29,8 @@ impl Url {
             "http" => Protocol::HTTP,
             "https" => Protocol::HTTPS,
             _ => {
-                let err = Error::new(ErrorKind::InvalidInput,
-                                     "Invalid URL.");
+                let err = io::Error::new(ErrorKind::InvalidInput,
+                                         "The protocol is not supported.");
                 return Err(err);
             }
         };
@@ -38,8 +38,8 @@ impl Url {
         let host = match parsed_url.domain() {
             Some(domain) => domain,
             None => {
-                let err = Error::new(ErrorKind::InvalidInput,
-                                     "Invalid URL.");
+                let err = io::Error::new(ErrorKind::InvalidInput,
+                                         "The URL is invalid.");
                 return Err(err);
             }
         };
