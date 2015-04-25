@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/ghmlee/rust-request.svg?branch=master)](https://travis-ci.org/ghmlee/rust-request)
 
+Documentation is available [here](https://ghmlee.github.io/rust-request/doc/request).
+
 ## Quick start
 
 ```
