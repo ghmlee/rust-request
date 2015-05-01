@@ -8,7 +8,7 @@ Documentation is available [here](https://ghmlee.github.io/rust-request/doc/requ
 
 ```
 [dependencies]
-request = "0.0.6"
+request = "0.0.7"
 ```
 
 ```rust
