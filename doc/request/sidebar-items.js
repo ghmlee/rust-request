@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["delete",""],["get",""],["head",""],["options",""],["post",""],["put",""]],"mod":[["response",""]]});
+initSidebarItems({"mod":[["response",""]],"fn":[["delete",""],["get",""],["head",""],["options",""],["post",""],["put",""]]});
