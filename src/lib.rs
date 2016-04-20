@@ -121,7 +121,7 @@ fn connect(method: &str,
                 }
             };
 
-            let mut ssl_stream = match SslStream::new(&context, stream) {
+            let mut ssl_stream = match SslStream::connect(&context, stream) {
                 Ok(stream) => stream,
                 Err(e) => {
                     let err = io::Error::new(ErrorKind::NotConnected,
