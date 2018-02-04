@@ -12,4 +12,9 @@ keywords = ["request", "http", "client", "hyper", "postman"]
 
 [dependencies]
 url = "0.2.36"
+
+[target.'cfg(not(windows))'.dependencies]
 openssl = "0.6.4"
+
+[target.'cfg(windows)'.dependencies]
+native-tls = "0.1.5"

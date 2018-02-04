@@ -1,6 +1,11 @@
 //! Request
 #![doc(html_root_url="https://ghmlee.github.io/rust-request/doc")]
+
+#[cfg(not(windows))]
 extern crate openssl;
+
+#[cfg(windows)]
+extern crate native_tls;
 
 mod url;
 pub mod response;
@@ -12,8 +17,15 @@ use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::net::TcpStream;
 use url::{Protocol, Url};
 use response::Response;
+
+#[cfg(not(windows))]
 use openssl::ssl::{SslStream, SslContext};
+
+#[cfg(not(windows))]
 use openssl::ssl::SslMethod::Sslv23;
+
+#[cfg(windows)]
+use native_tls::TlsConnector;
 
 pub fn post(url: &str,
             headers: &mut HashMap<String, String>,
@@ -111,6 +123,7 @@ fn connect(method: &str,
             let raw = try!(read(&mut stream));
             raw
         }
+        #[cfg(not(windows))]
         Protocol::HTTPS => {
             let context = match SslContext::new(Sslv23) {
                 Ok(context) => context,
@@ -130,6 +143,37 @@ fn connect(method: &str,
                 }
             };
 
+            let _ = ssl_stream.write(&*buf);
+            let raw = try!(read(&mut ssl_stream));
+            raw
+        }
+        #[cfg(windows)]
+        Protocol::HTTPS => {
+            let connector = match TlsConnector::builder() {
+                Ok(builder) => match builder.build() {
+                    Ok(connector) => connector,
+                    Err(e) => {
+                        let err = io::Error::new(ErrorKind::NotConnected,
+                                                 e.description());
+                        return Err(err);
+                    }
+                },
+                Err(e) => {
+                    let err = io::Error::new(ErrorKind::NotConnected,
+                                             e.description());
+                    return Err(err);
+                }
+            };
+
+            let mut ssl_stream = match connector.connect(&url.host, stream) {
+                Ok(stream) => stream,
+                Err(e) => {
+                    let err = io::Error::new(ErrorKind::NotConnected,
+                                             e.description());
+                    return Err(err);
+                }
+            };
+            
             let _ = ssl_stream.write(&*buf);
             let raw = try!(read(&mut ssl_stream));
             raw
